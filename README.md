@@ -1,4 +1,4 @@
-# ESP32-S3 (N16R8) + 2.8" ILI9341 3D Platformer Screen
+# ESP32-S3 + 2.8" ILI9341 3D Platformer Screen
 
 A retro 3D platformer dashboard featuring live WiFi weather fetching with big 8-bit procedural weather art, an interactive Python monthly grid calendar with automatic daily event rollover, real-world date countdowns, and a pseudo-3D scrolling ground & sky world.
 
@@ -34,7 +34,7 @@ A retro 3D platformer dashboard featuring live WiFi weather fetching with big 8-
    - The ESP32 syncs with atomic NTP time over WiFi, checks the current real-world date, updates the date banner automatically (e.g. `SATURDAY, NOV 21`), and loads that day's events when that date arrives.
 4. **Touch Calibration:**
    - First-boot interactive 4-corner calibration with flash memory persistence.
-   - Re-calibratable anytime via the **🎯 Calibrate Touch** button in the Python companion.
+   - Re-calibratable anytime via the **Calibrate Touch** button in the Python companion.
 5. **Zero-Flicker Double Buffering:**
    - Full 320x240 16-bit PSRAM canvas sprite running at 35–40 FPS.
 
@@ -57,4 +57,4 @@ A retro 3D platformer dashboard featuring live WiFi weather fetching with big 8-
 2. Select your ESP32's COM port and click **Connect**.
 3. **WiFi:** Connect the ESP32 to your WiFi network using the top bar.
 4. **Weather:** Set your city and watch the live weather and big procedural icon update!
-5. **Grid Calendar:** Click any date on the calendar, enter events, and click **💾 Save Events for this Date**. The schedule syncs to the ESP32 and will automatically display when that day comes.
+5. **Grid Calendar:** Click any date on the calendar, enter events, and click ** Save Events for this Date**. The schedule syncs to the ESP32 and will automatically display when that day comes.
