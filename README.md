@@ -1,5 +1,5 @@
 # Glance
-![Glance Launch Poster](Glance/Stamp Border.png)
+![Glance Launch Poster](assets/launch.png)
 
 A retro 3D platformer dashboard featuring live WiFi weather fetching with big 8-bit procedural weather art, an interactive Python monthly grid calendar with automatic daily event rollover, real-world date countdowns, and a pseudo-3D scrolling ground & sky world.
 
