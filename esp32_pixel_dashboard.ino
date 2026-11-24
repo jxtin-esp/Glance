@@ -50,7 +50,7 @@ struct WeatherData {
   uint8_t fontMode; // 0 = Retro Pixel (GLCD), 1 = Clean Modern (Font 2/4)
   ScreenColors colors;
 } weather = {
-  "Tokyo", "24C", "CONNECTING...", "SYNCING WIFI", 0,
+  "Tokyo", "--C", "CONNECTING...", "SYNCING WIFI", 0,
   { 0xFFFF, 0xFDE0, 0x18C6 } // White, Gold accent, Dark Indigo Card
 };
 
@@ -132,6 +132,17 @@ uint8_t heroAnimFrame = 0;
 // --- FORWARD DECLARATIONS ---
 void runTouchCalibration();
 void updateCalendarFromNTP();
+void loadTouchCalibration();
+void saveWiFiCredentials(const String& ssid, const String& pass);
+void loadWiFiCredentials();
+void saveWeatherConfig();
+void loadWeatherConfig();
+void saveCountdownConfig();
+void loadCountdownConfig();
+void saveCalendarConfig();
+void loadCalendarConfig();
+void saveCurrentScreen();
+void loadCurrentScreen();
 
 // --- COLOR HELPER: Convert "#RRGGBB" to RGB565 ---
 uint16_t hexTo565(const char* hex) {
@@ -704,6 +715,159 @@ void runTouchCalibration() {
   delay(1400);
 }
 
+// --- NON-VOLATILE FLASH (NVS PREFERENCES) PERSISTENCE HELPERS ---
+void loadTouchCalibration() {
+  prefs.begin("dashboard", false);
+  size_t calLen = prefs.getBytesLength("touchCal");
+  if (calLen == sizeof(touchCalData)) {
+    prefs.getBytes("touchCal", touchCalData, sizeof(touchCalData));
+    prefs.end();
+    tft.setTouch(touchCalData);
+    Serial.printf("[Touch] Loaded calibration from flash: [%d, %d, %d, %d, %d]\n",
+      touchCalData[0], touchCalData[1], touchCalData[2], touchCalData[3], touchCalData[4]);
+  } else {
+    prefs.end();
+    Serial.println(F("[Touch] First boot detected! Launching interactive calibration..."));
+    runTouchCalibration();
+  }
+}
+
+void saveWiFiCredentials(const String& ssid, const String& pass) {
+  prefs.begin("dashboard", false);
+  prefs.putString("ssid", ssid);
+  prefs.putString("pass", pass);
+  prefs.end();
+  Serial.printf("[NVS] Saved WiFi SSID: %s\n", ssid.c_str());
+}
+
+void loadWiFiCredentials() {
+  prefs.begin("dashboard", true);
+  String savedSSID = prefs.getString("ssid", "");
+  String savedPASS = prefs.getString("pass", "");
+  prefs.end();
+  if (savedSSID.length() > 0) {
+    wifiSSID = savedSSID;
+    wifiPASS = savedPASS;
+    Serial.printf("[NVS] Loaded WiFi SSID: %s\n", wifiSSID.c_str());
+  }
+}
+
+void saveWeatherConfig() {
+  prefs.begin("dashboard", false);
+  prefs.putString("w_city", weather.city);
+  prefs.putUChar("w_font", weather.fontMode);
+  prefs.putUShort("w_ctxt", weather.colors.text);
+  prefs.putUShort("w_cacc", weather.colors.accent);
+  prefs.putUShort("w_cbg", weather.colors.cardBg);
+  prefs.putString("w_temp", weather.temp);
+  prefs.putString("w_cond", weather.condition);
+  prefs.putString("w_sub", weather.subText);
+  prefs.end();
+  Serial.printf("[NVS] Saved Weather Config: %s\n", weather.city);
+}
+
+void loadWeatherConfig() {
+  prefs.begin("dashboard", true);
+  String savedCity = prefs.getString("w_city", "");
+  if (savedCity.length() > 0) {
+    strlcpy(weather.city, savedCity.c_str(), sizeof(weather.city));
+    weather.fontMode = prefs.getUChar("w_font", weather.fontMode);
+    weather.colors.text = prefs.getUShort("w_ctxt", weather.colors.text);
+    weather.colors.accent = prefs.getUShort("w_cacc", weather.colors.accent);
+    weather.colors.cardBg = prefs.getUShort("w_cbg", weather.colors.cardBg);
+
+    String savedTemp = prefs.getString("w_temp", "");
+    String savedCond = prefs.getString("w_cond", "");
+    String savedSub = prefs.getString("w_sub", "");
+    if (savedTemp.length() > 0) strlcpy(weather.temp, savedTemp.c_str(), sizeof(weather.temp));
+    if (savedCond.length() > 0) strlcpy(weather.condition, savedCond.c_str(), sizeof(weather.condition));
+    if (savedSub.length() > 0) strlcpy(weather.subText, savedSub.c_str(), sizeof(weather.subText));
+    Serial.printf("[NVS] Loaded Weather: %s (%s, %s)\n", weather.city, weather.temp, weather.condition);
+  }
+  prefs.end();
+}
+
+void saveCountdownConfig() {
+  prefs.begin("dashboard", false);
+  prefs.putString("cd_title", countdown.title);
+  prefs.putBytes("cd_epoch", &countdown.targetEpoch, sizeof(countdown.targetEpoch));
+  prefs.putUInt("cd_secs", countdown.remainingSecs);
+  prefs.putUChar("cd_font", countdown.fontMode);
+  prefs.putUShort("cd_ctxt", countdown.colors.text);
+  prefs.putUShort("cd_cacc", countdown.colors.accent);
+  prefs.putUShort("cd_cbg", countdown.colors.cardBg);
+  prefs.end();
+  Serial.printf("[NVS] Saved Countdown: '%s'\n", countdown.title);
+}
+
+void loadCountdownConfig() {
+  prefs.begin("dashboard", true);
+  String savedTitle = prefs.getString("cd_title", "");
+  if (savedTitle.length() > 0) {
+    strlcpy(countdown.title, savedTitle.c_str(), sizeof(countdown.title));
+    if (prefs.getBytesLength("cd_epoch") == sizeof(countdown.targetEpoch)) {
+      prefs.getBytes("cd_epoch", &countdown.targetEpoch, sizeof(countdown.targetEpoch));
+    }
+    countdown.remainingSecs = prefs.getUInt("cd_secs", countdown.remainingSecs);
+    countdown.fontMode = prefs.getUChar("cd_font", countdown.fontMode);
+    countdown.colors.text = prefs.getUShort("cd_ctxt", countdown.colors.text);
+    countdown.colors.accent = prefs.getUShort("cd_cacc", countdown.colors.accent);
+    countdown.colors.cardBg = prefs.getUShort("cd_cbg", countdown.colors.cardBg);
+    Serial.printf("[NVS] Loaded Countdown: '%s'\n", countdown.title);
+  }
+  prefs.end();
+}
+
+void saveCalendarConfig() {
+  prefs.begin("dashboard", false);
+  prefs.putString("c_hdr", calendarData.dateHeader);
+  prefs.putString("c_e1", calendarData.event1);
+  prefs.putString("c_e2", calendarData.event2);
+  prefs.putString("c_e3", calendarData.event3);
+  prefs.putUChar("c_font", calendarData.fontMode);
+  prefs.putUShort("c_ctxt", calendarData.colors.text);
+  prefs.putUShort("c_cacc", calendarData.colors.accent);
+  prefs.putUShort("c_cbg", calendarData.colors.cardBg);
+  prefs.putBytes("c_sched", scheduleStore, sizeof(scheduleStore));
+  prefs.end();
+  Serial.println(F("[NVS] Saved Calendar Config & Store."));
+}
+
+void loadCalendarConfig() {
+  prefs.begin("dashboard", true);
+  String savedHdr = prefs.getString("c_hdr", "");
+  if (savedHdr.length() > 0) {
+    strlcpy(calendarData.dateHeader, savedHdr.c_str(), sizeof(calendarData.dateHeader));
+    String e1 = prefs.getString("c_e1", "");
+    String e2 = prefs.getString("c_e2", "");
+    String e3 = prefs.getString("c_e3", "");
+    if (e1.length() > 0) strlcpy(calendarData.event1, e1.c_str(), sizeof(calendarData.event1));
+    if (e2.length() > 0) strlcpy(calendarData.event2, e2.c_str(), sizeof(calendarData.event2));
+    if (e3.length() > 0) strlcpy(calendarData.event3, e3.c_str(), sizeof(calendarData.event3));
+    calendarData.fontMode = prefs.getUChar("c_font", calendarData.fontMode);
+    calendarData.colors.text = prefs.getUShort("c_ctxt", calendarData.colors.text);
+    calendarData.colors.accent = prefs.getUShort("c_cacc", calendarData.colors.accent);
+    calendarData.colors.cardBg = prefs.getUShort("c_cbg", calendarData.colors.cardBg);
+  }
+  if (prefs.getBytesLength("c_sched") == sizeof(scheduleStore)) {
+    prefs.getBytes("c_sched", scheduleStore, sizeof(scheduleStore));
+    Serial.println(F("[NVS] Loaded Calendar Store."));
+  }
+  prefs.end();
+}
+
+void saveCurrentScreen() {
+  prefs.begin("dashboard", false);
+  prefs.putUChar("cur_scr", currentScreen);
+  prefs.end();
+}
+
+void loadCurrentScreen() {
+  prefs.begin("dashboard", true);
+  currentScreen = prefs.getUChar("cur_scr", 0) % TOTAL_SCREENS;
+  prefs.end();
+}
+
 // --- HTTP LIVE WEATHER FETCH (wttr.in format=%t|%C|%h) ---
 void executeWeatherFetch() {
   if (WiFi.status() != WL_CONNECTED) {
@@ -750,6 +914,7 @@ void executeWeatherFetch() {
       strlcpy(weather.condition, c.c_str(), sizeof(weather.condition));
       snprintf(weather.subText, sizeof(weather.subText), "HUMIDITY %s", h.c_str());
       Serial.println(F("[Weather] Updated successfully!"));
+      saveWeatherConfig();
     }
   } else {
     Serial.printf("[Weather] HTTP failed with code: %d\n", httpCode);
@@ -762,11 +927,16 @@ void executeWeatherFetch() {
 // --- FREERTOS BACKGROUND TASK PINNED TO CORE 0 ---
 void backgroundNetworkTask(void* pvParameters) {
   WiFi.mode(WIFI_STA);
-  WiFi.begin(wifiSSID.c_str(), wifiPASS.c_str());
-  Serial.printf("[Network] Connecting to WiFi SSID: %s\n", wifiSSID.c_str());
+  bool hasCreds = (wifiSSID.length() > 0 && wifiSSID != DEFAULT_WIFI_SSID);
+  if (hasCreds) {
+    WiFi.begin(wifiSSID.c_str(), wifiPASS.c_str());
+    Serial.printf("[Network] Connecting to WiFi SSID: %s\n", wifiSSID.c_str());
+  } else {
+    Serial.println(F("[Network] No WiFi credentials configured yet. Waiting for configuration..."));
+  }
 
   int wifiRetries = 0;
-  while (WiFi.status() != WL_CONNECTED && wifiRetries < 25) {
+  while (WiFi.status() != WL_CONNECTED && wifiRetries < 25 && hasCreds) {
     vTaskDelay(pdMS_TO_TICKS(500));
     wifiRetries++;
   }
@@ -775,8 +945,9 @@ void backgroundNetworkTask(void* pvParameters) {
     Serial.printf("[Network] WiFi Connected! IP: %s\n", WiFi.localIP().toString().c_str());
     configTime(0, 0, "pool.ntp.org", "time.google.com");
     ntpSynced = true;
+    updateCalendarFromNTP();
     executeWeatherFetch();
-  } else {
+  } else if (hasCreds) {
     Serial.println(F("[Network] WiFi connection timed out. Check credentials."));
   }
 
@@ -819,10 +990,7 @@ void parseSerialCommand() {
     if (doc["ssid"].is<const char*>() && doc["pass"].is<const char*>()) {
       wifiSSID = doc["ssid"].as<String>();
       wifiPASS = doc["pass"].as<String>();
-      prefs.begin("dashboard", false);
-      prefs.putString("ssid", wifiSSID);
-      prefs.putString("pass", wifiPASS);
-      prefs.end();
+      saveWiFiCredentials(wifiSSID, wifiPASS);
       Serial.println(F("OK: WiFi Credentials Saved. Reconnecting..."));
       WiFi.disconnect();
       WiFi.begin(wifiSSID.c_str(), wifiPASS.c_str());
@@ -839,7 +1007,8 @@ void parseSerialCommand() {
     if (doc["txt"].is<const char*>())  weather.colors.text = hexTo565(doc["txt"]);
     if (doc["acc"].is<const char*>())  weather.colors.accent = hexTo565(doc["acc"]);
     if (doc["card"].is<const char*>()) weather.colors.cardBg = hexTo565(doc["card"]);
-    Serial.println(F("OK: Weather City Updated. Background Fetch Triggered."));
+    saveWeatherConfig();
+    Serial.println(F("OK: Weather City Updated & Saved to Flash. Background Fetch Triggered."));
   }
   // 4. Bulk Calendar Schedule Sync from Python Grid
   else if (strcmp(type, "calendar_sync") == 0) {
@@ -868,7 +1037,8 @@ void parseSerialCommand() {
 
     // Update today's events from store right away
     updateCalendarFromNTP();
-    Serial.println(F("OK: Calendar Store Synchronized."));
+    saveCalendarConfig();
+    Serial.println(F("OK: Calendar Store Synchronized & Saved to Flash."));
   }
   // 5. Direct Calendar Single-Day Display Update
   else if (strcmp(type, "calendar") == 0) {
@@ -880,7 +1050,8 @@ void parseSerialCommand() {
     if (doc["txt"].is<const char*>())    calendarData.colors.text = hexTo565(doc["txt"]);
     if (doc["acc"].is<const char*>())    calendarData.colors.accent = hexTo565(doc["acc"]);
     if (doc["card"].is<const char*>())   calendarData.colors.cardBg = hexTo565(doc["card"]);
-    Serial.println(F("OK: Live Calendar Updated."));
+    saveCalendarConfig();
+    Serial.println(F("OK: Live Calendar Updated & Saved to Flash."));
   }
   // 6. Countdown Update (with Target Epoch)
   else if (strcmp(type, "countdown") == 0) {
@@ -891,12 +1062,14 @@ void parseSerialCommand() {
     if (doc["txt"].is<const char*>())          countdown.colors.text = hexTo565(doc["txt"]);
     if (doc["acc"].is<const char*>())          countdown.colors.accent = hexTo565(doc["acc"]);
     if (doc["card"].is<const char*>())         countdown.colors.cardBg = hexTo565(doc["card"]);
-    Serial.println(F("OK: Countdown Updated."));
+    saveCountdownConfig();
+    Serial.println(F("OK: Countdown Updated & Saved to Flash."));
   }
   // 7. Force Screen Switch
   else if (strcmp(type, "switch_screen") == 0) {
     if (doc["screen"].is<uint8_t>()) {
       currentScreen = (doc["screen"].as<uint8_t>()) % TOTAL_SCREENS;
+      saveCurrentScreen();
       Serial.print(F("OK: Screen Switched to "));
       Serial.println(currentScreen);
     }
@@ -933,12 +1106,15 @@ void handleTouchGestures() {
         } else {
           currentScreen = (currentScreen == 0) ? (TOTAL_SCREENS - 1) : (currentScreen - 1);
         }
+        saveCurrentScreen();
       }
       else if (touchStartY > 190) {
         if (touchStartX < 60) {
           currentScreen = (currentScreen == 0) ? (TOTAL_SCREENS - 1) : (currentScreen - 1);
+          saveCurrentScreen();
         } else if (touchStartX > 260) {
           currentScreen = (currentScreen + 1) % TOTAL_SCREENS;
+          saveCurrentScreen();
         }
       }
     }
@@ -954,33 +1130,20 @@ void setup() {
   tft.init();
   tft.setRotation(1); // 320x240 Landscape
 
-  // Check if touch calibration exists in NVS Flash (First Boot check)
-  prefs.begin("dashboard", false);
-  size_t calLen = prefs.getBytesLength("touchCal");
-  if (calLen == sizeof(touchCalData)) {
-    prefs.getBytes("touchCal", touchCalData, sizeof(touchCalData));
-    tft.setTouch(touchCalData);
-    Serial.printf("[Touch] Loaded calibration from flash: [%d, %d, %d, %d, %d]\n",
-      touchCalData[0], touchCalData[1], touchCalData[2], touchCalData[3], touchCalData[4]);
-  } else {
-    Serial.println(F("[Touch] First boot detected! Launching interactive calibration..."));
-    runTouchCalibration();
-  }
-
-  // Load saved WiFi credentials
-  String savedSSID = prefs.getString("ssid", "");
-  String savedPASS = prefs.getString("pass", "");
-  prefs.end();
-
-  if (savedSSID.length() > 0) {
-    wifiSSID = savedSSID;
-    wifiPASS = savedPASS;
-  }
-
   // Initialize schedule store with empty state
   for (int i = 0; i < MAX_SCHEDULED_DAYS; i++) {
     scheduleStore[i].active = false;
   }
+
+  // Load touch calibration from NVS Flash
+  loadTouchCalibration();
+
+  // Load saved configurations from NVS Flash
+  loadWiFiCredentials();
+  loadWeatherConfig();
+  loadCalendarConfig();
+  loadCountdownConfig();
+  loadCurrentScreen();
 
   // Allocate 320x240 16-bit double buffer in 8MB PSRAM (~153.6 KB)
   canvas.setAttribute(PSRAM_ENABLE, true);

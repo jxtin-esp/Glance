@@ -39,6 +39,9 @@ A retro 3D platformer dashboard featuring live WiFi weather fetching with big 8-
    - Re-calibratable anytime via the **🎯 Calibrate Touch** button in the Python companion.
 5. **Zero-Flicker Double Buffering:**
    - Full 320x240 16-bit PSRAM canvas sprite running at 35–40 FPS.
+6. **Permanent Flash (NVS) Persistence:**
+   - WiFi credentials, selected weather city/location, custom color palettes, font modes, full calendar schedule, countdown target date/time, and active screen persist permanently in ESP32 non-volatile flash memory (Preferences).
+   - When unplugged or power-cycled, Glance reboots automatically to your configured city, reconnects to your WiFi, resumes ticking real-world countdowns, and remembers your preferences without requiring a PC reconnection.
 
 ## How to Flash & Run
 

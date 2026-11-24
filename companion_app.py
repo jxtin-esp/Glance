@@ -10,6 +10,80 @@ import os
 
 ser = None
 EVENTS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "calendar_events.json")
+CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
+
+# Persistent Application Configuration (WiFi, Weather, Countdown settings)
+def load_config():
+    if os.path.exists(CONFIG_FILE):
+        try:
+            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return {}
+    return {}
+
+def save_config(config_dict):
+    try:
+        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+            json.dump(config_dict, f, indent=2, ensure_ascii=False)
+    except Exception as e:
+        print(f"Error saving config: {e}")
+
+saved_cfg = load_config()
+
+def persist_all_settings():
+    cfg = load_config()
+    try:
+        if 'wifi_ssid_entry' in globals():
+            cfg["wifi_ssid"] = wifi_ssid_entry.get().strip()
+        if 'wifi_pass_entry' in globals():
+            cfg["wifi_pass"] = wifi_pass_entry.get().strip()
+    except Exception:
+        pass
+    try:
+        if 'w_city' in globals():
+            cfg["weather_city"] = w_city.get().strip()
+        if 'w_font' in globals():
+            cfg["weather_font"] = w_font.current()
+        if 'w_txt' in globals():
+            cfg["weather_txt"] = w_txt.get().strip()
+        if 'w_acc' in globals():
+            cfg["weather_acc"] = w_acc.get().strip()
+        if 'w_card' in globals():
+            cfg["weather_card"] = w_card.get().strip()
+    except Exception:
+        pass
+    try:
+        if 'cal_font' in globals():
+            cfg["cal_font"] = cal_font.current()
+        if 'cal_txt' in globals():
+            cfg["cal_txt"] = cal_txt.get().strip()
+        if 'cal_acc' in globals():
+            cfg["cal_acc"] = cal_acc.get().strip()
+        if 'cal_card' in globals():
+            cfg["cal_card"] = cal_card.get().strip()
+    except Exception:
+        pass
+    try:
+        if 'cd_title' in globals():
+            cfg["cd_title"] = cd_title.get().strip()
+        if 'spin_year' in globals():
+            cfg["cd_year"] = int(spin_year.get())
+            cfg["cd_month"] = int(spin_month.get())
+            cfg["cd_day"] = int(spin_day.get())
+            cfg["cd_hour"] = int(spin_hour.get())
+            cfg["cd_minute"] = int(spin_min.get())
+        if 'cd_font' in globals():
+            cfg["cd_font"] = cd_font.current()
+        if 'cd_txt' in globals():
+            cfg["cd_txt"] = cd_txt.get().strip()
+        if 'cd_acc' in globals():
+            cfg["cd_acc"] = cd_acc.get().strip()
+        if 'cd_card' in globals():
+            cfg["cd_card"] = cd_card.get().strip()
+    except Exception:
+        pass
+    save_config(cfg)
 
 # Load calendar events from local JSON file
 def load_events():
@@ -144,10 +218,12 @@ wifi_frame.pack(fill="x", padx=10, pady=4)
 
 tk.Label(wifi_frame, text="📶 WiFi SSID:", bg="#1E293B", fg="#94A3B8", font=("Segoe UI", 9)).pack(side="left")
 wifi_ssid_entry = tk.Entry(wifi_frame, width=14, bg="#0F172A", fg="#FFF", insertbackground="white", relief="flat")
+wifi_ssid_entry.insert(0, saved_cfg.get("wifi_ssid", ""))
 wifi_ssid_entry.pack(side="left", padx=(4, 8), ipady=2)
 
 tk.Label(wifi_frame, text="Password:", bg="#1E293B", fg="#94A3B8", font=("Segoe UI", 9)).pack(side="left")
 wifi_pass_entry = tk.Entry(wifi_frame, width=14, bg="#0F172A", fg="#FFF", insertbackground="white", relief="flat", show="*")
+wifi_pass_entry.insert(0, saved_cfg.get("wifi_pass", ""))
 wifi_pass_entry.pack(side="left", padx=(4, 8), ipady=2)
 
 def send_wifi_creds():
@@ -156,9 +232,10 @@ def send_wifi_creds():
     if not ssid:
         messagebox.showerror("Error", "Please enter your WiFi SSID.")
         return
+    persist_all_settings()
     payload = {"type": "wifi", "ssid": ssid, "pass": password}
     if send_payload(payload):
-        messagebox.showinfo("WiFi Sent", f"Credentials sent to ESP32! Connecting to '{ssid}'...")
+        messagebox.showinfo("WiFi Sent", f"Credentials sent and permanently saved to ESP32! Connecting to '{ssid}'...")
 
 tk.Button(wifi_frame, text="Connect ESP32 to WiFi", bg="#3B82F6", fg="#FFF", relief="flat", padx=8, command=send_wifi_creds).pack(side="right")
 
@@ -207,25 +284,26 @@ info_box = tk.Label(tab_weather, text="ℹ️ The ESP32 connects to WiFi and aut
                     bg="#1E293B", fg="#38BDF8", font=("Segoe UI", 8), wraplength=600, justify="left", padx=10, pady=8)
 info_box.pack(fill="x", pady=(0, 10))
 
-w_city = create_field(tab_weather, "City / Location:", "Tokyo")
+w_city = create_field(tab_weather, "City / Location:", saved_cfg.get("weather_city", "Tokyo"))
 
 font_frame_w = tk.Frame(tab_weather, bg="#0F172A")
 font_frame_w.pack(fill="x", pady=4)
 tk.Label(font_frame_w, text="Typography:", width=16, anchor="w", bg="#0F172A", fg="#94A3B8", font=("Segoe UI", 9)).pack(side="left")
 w_font = ttk.Combobox(font_frame_w, values=["0: Retro 8-Bit Pixel", "1: Clean Modern"], width=22, state="readonly")
-w_font.current(0)
+w_font.current(saved_cfg.get("weather_font", 0))
 w_font.pack(side="left", ipady=3)
 
 tk.Label(tab_weather, text="🎨 Card & Text Palette Customization", bg="#0F172A", fg="#38BDF8", font=("Segoe UI", 10, "bold")).pack(anchor="w", pady=(12, 4))
-w_txt, _ = create_color_picker(tab_weather, "Text Color:", "#FFFFFF")
-w_acc, _ = create_color_picker(tab_weather, "Accent Color:", "#F59E0B")
-w_card, _ = create_color_picker(tab_weather, "Card Container:", "#172338")
+w_txt, _ = create_color_picker(tab_weather, "Text Color:", saved_cfg.get("weather_txt", "#FFFFFF"))
+w_acc, _ = create_color_picker(tab_weather, "Accent Color:", saved_cfg.get("weather_acc", "#F59E0B"))
+w_card, _ = create_color_picker(tab_weather, "Card Container:", saved_cfg.get("weather_card", "#172338"))
 
 def send_weather_city():
     city = w_city.get().strip()
     if not city:
         messagebox.showerror("Error", "City cannot be empty.")
         return
+    persist_all_settings()
     payload = {
         "type": "weather_city",
         "city": city,
@@ -235,7 +313,7 @@ def send_weather_city():
         "card": w_card.get().strip()
     }
     if send_payload(payload):
-        messagebox.showinfo("City Updated", f"Sent city '{city}' to ESP32! Live weather fetch initiated.")
+        messagebox.showinfo("City Updated", f"Sent city '{city}' to ESP32! Saved to flash & live weather fetch initiated.")
 
 tk.Button(tab_weather, text="Update City & Fetch Live Weather", bg="#3B82F6", fg="#FFF", font=("Segoe UI", 10, "bold"),
           relief="flat", pady=8, command=send_weather_city).pack(fill="x", pady=(16, 0))
@@ -404,14 +482,15 @@ font_frame_c = tk.Frame(cal_style_frame, bg="#0F172A")
 font_frame_c.pack(fill="x", pady=2)
 tk.Label(font_frame_c, text="Typography:", width=16, anchor="w", bg="#0F172A", fg="#94A3B8", font=("Segoe UI", 9)).pack(side="left")
 cal_font = ttk.Combobox(font_frame_c, values=["0: Retro 8-Bit Pixel", "1: Clean Modern"], width=22, state="readonly")
-cal_font.current(0)
+cal_font.current(saved_cfg.get("cal_font", 0))
 cal_font.pack(side="left", ipady=2)
 
-cal_txt, _ = create_color_picker(cal_style_frame, "Text Color:", "#FFFFFF")
-cal_acc, _ = create_color_picker(cal_style_frame, "Accent Dot:", "#10B981")
-cal_card, _ = create_color_picker(cal_style_frame, "Card Container:", "#111827")
+cal_txt, _ = create_color_picker(cal_style_frame, "Text Color:", saved_cfg.get("cal_txt", "#FFFFFF"))
+cal_acc, _ = create_color_picker(cal_style_frame, "Accent Dot:", saved_cfg.get("cal_acc", "#10B981"))
+cal_card, _ = create_color_picker(cal_style_frame, "Card Container:", saved_cfg.get("cal_card", "#111827"))
 
 def sync_full_calendar_to_esp32(silent=False):
+    persist_all_settings()
     # Prepare bulk calendar payload
     events_list = []
     for dstr, evs in all_calendar_events.items():
@@ -432,7 +511,7 @@ def sync_full_calendar_to_esp32(silent=False):
     }
     ok = send_payload(payload)
     if ok and not silent:
-        messagebox.showinfo("Calendar Synced", f"Synchronized {len(events_list)} scheduled day(s) to ESP32!\n\nThe ESP32 will automatically display each day's events as that day arrives.")
+        messagebox.showinfo("Calendar Synced", f"Synchronized {len(events_list)} scheduled day(s) to ESP32!\n\nThe schedule is saved to flash and will automatically display each day's events as that day arrives.")
 
 tk.Button(tab_calendar, text="⚡ Sync Full Calendar Schedule to ESP32", bg="#10B981", fg="#FFF", font=("Segoe UI", 10, "bold"),
           relief="flat", pady=8, command=lambda: sync_full_calendar_to_esp32(silent=False)).pack(fill="x", pady=(6, 0))
@@ -441,7 +520,7 @@ tk.Button(tab_calendar, text="⚡ Sync Full Calendar Schedule to ESP32", bg="#10
 tab_countdown = tk.Frame(notebook, bg="#0F172A", padx=16, pady=12)
 notebook.add(tab_countdown, text=" ⏳ Countdown ")
 
-cd_title = create_field(tab_countdown, "Target Event:", "CYBERPUNK 2077")
+cd_title = create_field(tab_countdown, "Target Event:", saved_cfg.get("cd_title", "CYBERPUNK 2077"))
 
 # Date & Time Selection Box
 date_box = tk.LabelFrame(tab_countdown, text=" Select Target Date & Time ", bg="#0F172A", fg="#F472B6", font=("Segoe UI", 9, "bold"), padx=10, pady=8)
@@ -455,26 +534,26 @@ row_dt.pack(fill="x", pady=2)
 
 tk.Label(row_dt, text="Year:", bg="#0F172A", fg="#94A3B8").pack(side="left")
 spin_year = ttk.Spinbox(row_dt, from_=2024, to=2035, width=6)
-spin_year.set(target_default.year)
+spin_year.set(saved_cfg.get("cd_year", target_default.year))
 spin_year.pack(side="left", padx=(2, 8))
 
 tk.Label(row_dt, text="Month:", bg="#0F172A", fg="#94A3B8").pack(side="left")
 spin_month = ttk.Spinbox(row_dt, from_=1, to=12, width=4)
-spin_month.set(target_default.month)
+spin_month.set(saved_cfg.get("cd_month", target_default.month))
 spin_month.pack(side="left", padx=(2, 8))
 
 tk.Label(row_dt, text="Day:", bg="#0F172A", fg="#94A3B8").pack(side="left")
 spin_day = ttk.Spinbox(row_dt, from_=1, to=31, width=4)
-spin_day.set(target_default.day)
+spin_day.set(saved_cfg.get("cd_day", target_default.day))
 spin_day.pack(side="left", padx=(2, 8))
 
 tk.Label(row_dt, text="Time:", bg="#0F172A", fg="#94A3B8").pack(side="left")
 spin_hour = ttk.Spinbox(row_dt, from_=0, to=23, width=4)
-spin_hour.set(target_default.hour)
+spin_hour.set(saved_cfg.get("cd_hour", target_default.hour))
 spin_hour.pack(side="left", padx=2)
 tk.Label(row_dt, text=":", bg="#0F172A", fg="#FFF").pack(side="left")
 spin_min = ttk.Spinbox(row_dt, from_=0, to=59, width=4)
-spin_min.set(target_default.minute)
+spin_min.set(saved_cfg.get("cd_minute", target_default.minute))
 spin_min.pack(side="left", padx=2)
 
 # Quick Presets
@@ -533,13 +612,13 @@ font_frame_cd = tk.Frame(tab_countdown, bg="#0F172A")
 font_frame_cd.pack(fill="x", pady=4)
 tk.Label(font_frame_cd, text="Typography:", width=16, anchor="w", bg="#0F172A", fg="#94A3B8", font=("Segoe UI", 9)).pack(side="left")
 cd_font = ttk.Combobox(font_frame_cd, values=["0: Retro 8-Bit Pixel", "1: Clean Modern"], width=22, state="readonly")
-cd_font.current(0)
+cd_font.current(saved_cfg.get("cd_font", 0))
 cd_font.pack(side="left", ipady=3)
 
 tk.Label(tab_countdown, text="🎨 Card & Text Palette Customization", bg="#0F172A", fg="#F472B6", font=("Segoe UI", 10, "bold")).pack(anchor="w", pady=(10, 4))
-cd_txt, _ = create_color_picker(tab_countdown, "Digits Text:", "#FFFFFF")
-cd_acc, _ = create_color_picker(tab_countdown, "Accent Border:", "#EC4899")
-cd_card, _ = create_color_picker(tab_countdown, "Card Container:", "#20083B")
+cd_txt, _ = create_color_picker(tab_countdown, "Digits Text:", saved_cfg.get("cd_txt", "#FFFFFF"))
+cd_acc, _ = create_color_picker(tab_countdown, "Accent Border:", saved_cfg.get("cd_acc", "#EC4899"))
+cd_card, _ = create_color_picker(tab_countdown, "Card Container:", saved_cfg.get("cd_card", "#20083B"))
 
 def send_countdown():
     try:
@@ -552,6 +631,7 @@ def send_countdown():
         messagebox.showerror("Error", f"Invalid target date: {e}")
         return
 
+    persist_all_settings()
     payload = {
         "type": "countdown",
         "title": cd_title.get().strip(),
@@ -563,7 +643,7 @@ def send_countdown():
         "card": cd_card.get().strip()
     }
     if send_payload(payload):
-        messagebox.showinfo("Countdown Updated", f"Countdown target set to {target_dt.strftime('%Y-%m-%d %H:%M')} ({total_seconds // 86400} days left)!")
+        messagebox.showinfo("Countdown Updated", f"Countdown target set and permanently saved to ESP32 flash!\nTarget: {target_dt.strftime('%Y-%m-%d %H:%M')} ({total_seconds // 86400} days left)")
 
 tk.Button(tab_countdown, text="Sync Countdown Target to ESP32", bg="#EC4899", fg="#FFF", font=("Segoe UI", 10, "bold"),
           relief="flat", pady=8, command=send_countdown).pack(fill="x", pady=(14, 0))
@@ -573,6 +653,7 @@ bottom_frame = tk.Frame(root, bg="#0F172A", pady=6)
 bottom_frame.pack(fill="x", padx=10, pady=4)
 
 def sync_all():
+    persist_all_settings()
     send_weather_city()
     time.sleep(0.08)
     sync_full_calendar_to_esp32(silent=True)
